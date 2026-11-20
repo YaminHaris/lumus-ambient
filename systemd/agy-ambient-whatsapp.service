@@ -1,0 +1,9 @@
+[Unit]
+Description=Lumus WhatsApp Watcher
+After=agy-ambient.service network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/python3 %h/Development/lumus-ambient/whatsapp_watcher.py
+Environment=PYTHONUNBUFFERED=1
+Environment=PATH=%h/.local/bin:/usr/local/bin:/usr/bin:/bin

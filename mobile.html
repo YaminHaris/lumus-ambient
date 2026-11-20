@@ -1,0 +1,141 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="theme-color" content="#0f111a" />
+  <title>Lumus · Antigravity</title>
+  <style>
+    :root { --bg:#0f111a; --card:#1a1d2b; --text:#e6e8f0; --muted:#8c92a4; --accent:#7c5cff; --red:#ff5555; --green:#50fa7b; --yellow:#f1fa8c; }
+    * { box-sizing: border-box; font-family: system-ui, -apple-system, sans-serif; }
+    body { margin: 0; background: var(--bg); color: var(--text); min-height: 100dvh; display: flex; flex-direction: column; padding: 16px; gap: 14px; }
+    .top { display: flex; justify-content: space-between; align-items: center; }
+    .title { font-weight: 700; font-size: 18px; letter-spacing: 0.3px; }
+    .badge { font-size: 12px; padding: 4px 10px; border-radius: 999px; background: var(--card); color: var(--muted); font-weight: 600; }
+    .badge.listening { color: var(--red); }
+    .badge.thinking, .badge.dreaming { color: var(--yellow); }
+    .badge.speaking { color: var(--green); }
+    .card { background: var(--card); border-radius: 14px; padding: 14px; display: flex; flex-direction: column; gap: 8px; flex: 1; overflow-y: auto; }
+    .label { font-size: 11px; text-transform: uppercase; letter-spacing: 0.8px; color: var(--muted); }
+    .prompt-txt { font-size: 14px; color: #b8bed0; }
+    .resp-txt { font-size: 15px; line-height: 1.5; white-space: pre-wrap; word-break: break-word; }
+    .talk-btn { width: 100%; padding: 22px; border: none; border-radius: 18px; font-size: 18px; font-weight: 700; color: #fff; background: var(--accent); cursor: pointer; transition: transform 0.08s; }
+    .talk-btn.rec { background: var(--red); }
+    .talk-btn:active { transform: scale(0.98); }
+    .row { display: flex; gap: 8px; }
+    input[type=text] { flex: 1; padding: 12px 14px; border-radius: 12px; border: 1px solid #2b3045; background: var(--card); color: var(--text); font-size: 15px; outline: none; }
+    .send-btn { padding: 12px 18px; border-radius: 12px; border: none; background: #2b3045; color: var(--text); font-weight: 600; cursor: pointer; }
+  </style>
+</head>
+<body>
+  <div class="top">
+    <div class="title">Lumus · Hydrogen</div>
+    <div id="badge" class="badge">connecting…</div>
+  </div>
+
+  <div class="card">
+    <div class="label">You</div>
+    <div id="lastPrompt" class="prompt-txt">—</div>
+    <div class="label" style="margin-top:8px;">Lumus</div>
+    <div id="lastResp" class="resp-txt">Tap the button below and speak, or type a prompt.</div>
+  </div>
+
+  <button id="talkBtn" class="talk-btn">🎤 Tap to Talk</button>
+
+  <div class="row">
+    <input id="txt" type="text" placeholder="Type a prompt for Lumus…" />
+    <button id="sendBtn" class="send-btn">Send</button>
+  </div>
+
+  <audio id="player" playsinline></audio>
+
+<script>
+const params = new URLSearchParams(location.search);
+if (params.get('token')) {
+  localStorage.setItem('angie_token', params.get('token'));
+  history.replaceState({}, '', '/');
+}
+const TOKEN = localStorage.getItem('angie_token') || '';
+const hdrs = () => ({ 'Authorization': 'Bearer ' + TOKEN });
+
+let mediaRec = null;
+let chunks = [];
+let lastTtsSeq = -1;
+
+const badge = document.getElementById('badge');
+const talkBtn = document.getElementById('talkBtn');
+const lastPrompt = document.getElementById('lastPrompt');
+const lastResp = document.getElementById('lastResp');
+const txt = document.getElementById('txt');
+const player = document.getElementById('player');
+
+async function poll() {
+  try {
+    const r = await fetch('/api/status', { headers: hdrs() });
+    if (!r.ok) { badge.textContent = 'auth error'; return; }
+    const d = await r.json();
+    badge.textContent = `${d.state} · ${d.turns_count}t`;
+    badge.className = 'badge ' + d.state;
+    if (d.last_prompt) lastPrompt.textContent = d.last_prompt;
+    if (d.last_error) lastResp.textContent = 'Error: ' + d.last_error;
+    else if (d.last_response) lastResp.textContent = d.last_response;
+    if (d.tts_seq && d.tts_seq !== lastTtsSeq && lastTtsSeq !== -1 && d.tts_enabled) {
+      lastTtsSeq = d.tts_seq;
+      player.src = `/api/tts/${d.tts_seq}.mp3?token=${encodeURIComponent(TOKEN)}`;
+      player.play().catch(() => {});
+    } else if (lastTtsSeq === -1 && typeof d.tts_seq === 'number') {
+      lastTtsSeq = d.tts_seq;
+    }
+  } catch (e) {
+    badge.textContent = 'offline';
+  }
+}
+setInterval(poll, 1000);
+poll();
+
+talkBtn.onclick = async () => {
+  if (!mediaRec) {
+    try {
+      player.pause();
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      chunks = [];
+      mediaRec = new MediaRecorder(stream);
+      mediaRec.ondataavailable = e => { if (e.data.size > 0) chunks.push(e.data); };
+      mediaRec.onstop = async () => {
+        stream.getTracks().forEach(t => t.stop());
+        const blob = new Blob(chunks, { type: mediaRec.mimeType || 'audio/webm' });
+        mediaRec = null;
+        talkBtn.textContent = '🎤 Tap to Talk';
+        talkBtn.classList.remove('rec');
+        badge.textContent = 'transcribing…';
+        await fetch('/api/voice', { method: 'POST', headers: hdrs(), body: blob });
+        poll();
+      };
+      mediaRec.start();
+      talkBtn.textContent = '⏹ Tap to Stop & Send';
+      talkBtn.classList.add('rec');
+    } catch (e) {
+      alert('Mic error: ' + e.message);
+    }
+  } else {
+    mediaRec.stop();
+  }
+};
+
+async function sendText() {
+  const v = txt.value.trim();
+  if (!v) return;
+  txt.value = '';
+  await fetch('/api/prompt', {
+    method: 'POST',
+    headers: { ...hdrs(), 'Content-Type': 'application/json' },
+    body: JSON.stringify({ text: v })
+  });
+  poll();
+}
+document.getElementById('sendBtn').onclick = sendText;
+txt.addEventListener('keydown', e => { if (e.key === 'Enter') sendText(); });
+</script>
+</body>
+</html>

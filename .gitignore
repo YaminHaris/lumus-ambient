@@ -1,0 +1,16 @@
+# Secrets & runtime state
+telegram.json
+telegram_offset.txt
+token.txt
+*.pem
+*.key
+
+# Python & Node artifacts
+__pycache__/
+*.pyc
+.venv/
+mcp-browser/node_modules/
+
+# Logs & temporary files
+*.log
+/tmp/

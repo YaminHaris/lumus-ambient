@@ -1,0 +1,14 @@
+[Unit]
+Description=Lumus (Antigravity Ambient) Telegram Bridge
+After=agy-ambient.service network-online.target
+PartOf=agy-ambient.service
+
+[Service]
+Type=simple
+ExecStart=%h/.local/share/lumus-ambient/.venv/bin/python %h/Development/lumus-ambient/telegram_bridge.py
+Restart=always
+RestartSec=5
+Environment=PYTHONUNBUFFERED=1
+
+[Install]
+WantedBy=default.target

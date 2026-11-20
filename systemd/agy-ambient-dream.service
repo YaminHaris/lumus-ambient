@@ -1,0 +1,9 @@
+[Unit]
+Description=Lumus Periodic Dream Cycle
+After=agy-ambient.service network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/python3 %h/Development/lumus-ambient/dream_cycle.py
+Environment=PYTHONUNBUFFERED=1
+Environment=PATH=%h/.local/bin:/usr/local/bin:/usr/bin:/bin

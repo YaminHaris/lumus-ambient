@@ -1,0 +1,14 @@
+[Unit]
+Description=Antigravity Ambient Sleep/Wake Dreaming Watcher
+After=agy-ambient.service
+PartOf=agy-ambient.service
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/python3 %h/Development/lumus-ambient/sleep_watcher.py
+Restart=always
+RestartSec=3
+Environment=PYTHONUNBUFFERED=1
+
+[Install]
+WantedBy=default.target

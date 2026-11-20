@@ -1,0 +1,96 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+cmd="${1:-status}"
+
+run_root() {
+    if [[ "$(id -u)" -eq 0 ]]; then
+        "$@"
+    elif [[ -t 0 ]]; then
+        sudo "$@"
+    else
+        pkexec "$@"
+    fi
+}
+
+show_status() {
+    echo "=== Battery & Power ==="
+    upower -i "$(upower -e | grep BAT | head -n1)" | grep -E "state:|energy-rate:|time to|percentage:" || true
+    echo "=== GPU ==="
+    echo "prime-select: $(prime-select query 2>/dev/null || echo unknown)"
+    if [[ -r /sys/bus/pci/devices/0000:01:00.0/power/runtime_status ]]; then
+        echo "RTX 4050 runtime_status: $(cat /sys/bus/pci/devices/0000:01:00.0/power/runtime_status)"
+    fi
+    if nvidia_out="$(nvidia-smi --query-gpu=power.draw,pstate --format=csv,noheader 2>/dev/null)"; then
+        echo "RTX 4050 draw: $nvidia_out"
+    else
+        echo "RTX 4050: off / unloaded"
+    fi
+    echo "=== CPU & ASUS Profile ==="
+    echo "CPU boost: $(cat /sys/devices/system/cpu/cpufreq/boost 2>/dev/null || echo unknown)"
+    echo "CPU freq range: $(cat /sys/devices/system/cpu/cpu0/cpufreq/scaling_min_freq) - $(cat /sys/devices/system/cpu/cpu0/cpufreq/scaling_max_freq) kHz"
+    asusctl profile get 2>/dev/null || true
+}
+
+apply_study_root() {
+    local current
+    current="$(prime-select query 2>/dev/null || true)"
+    if [[ "$current" != "intel" ]]; then
+        prime-select intel
+    fi
+    echo 0 > /sys/devices/system/cpu/cpufreq/boost
+    for cpu in /sys/devices/system/cpu/cpu[0-9]*/cpufreq; do
+        echo 400000 > "$cpu/scaling_min_freq"
+        echo 2000000 > "$cpu/scaling_max_freq"
+    done
+}
+
+apply_beast_root() {
+    local current max_f
+    current="$(prime-select query 2>/dev/null || true)"
+    if [[ "$current" != "on-demand" ]]; then
+        prime-select on-demand
+    fi
+    echo 1 > /sys/devices/system/cpu/cpufreq/boost
+    for cpu in /sys/devices/system/cpu/cpu[0-9]*/cpufreq; do
+        max_f="$(cat "$cpu/cpuinfo_max_freq")"
+        echo "$max_f" > "$cpu/scaling_max_freq"
+        echo 400000 > "$cpu/scaling_min_freq"
+    done
+}
+
+case "$cmd" in
+    status)
+        show_status
+        ;;
+    _study_root)
+        apply_study_root
+        ;;
+    _beast_root)
+        apply_beast_root
+        ;;
+    study)
+        prev_gpu="$(prime-select query 2>/dev/null || true)"
+        run_root "$0" _study_root
+        asusctl profile set Quiet 2>/dev/null || true
+        asusctl leds set off 2>/dev/null || true
+        if [[ "$prev_gpu" != "intel" ]]; then
+            echo "NOTE: Log out and log back in to detach the RTX 4050 from Xorg."
+        fi
+        show_status
+        ;;
+    beast|gaming|hybrid)
+        prev_gpu="$(prime-select query 2>/dev/null || true)"
+        run_root "$0" _beast_root
+        asusctl profile set Performance 2>/dev/null || true
+        asusctl leds set med 2>/dev/null || true
+        if [[ "$prev_gpu" != "on-demand" ]]; then
+            echo "NOTE: Log out and log back in to re-enable RTX 4050 offload."
+        fi
+        show_status
+        ;;
+    *)
+        echo "Usage: power-mode [status|study|beast]"
+        exit 1
+        ;;
+esac

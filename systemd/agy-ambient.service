@@ -1,0 +1,14 @@
+[Unit]
+Description=Antigravity Ambient Background Session Daemon (Hydrogen)
+After=graphical-session.target pipewire.service pipewire-pulse.service
+
+[Service]
+Type=simple
+ExecStart=%h/.local/share/lumus-ambient/.venv/bin/python %h/Development/lumus-ambient/daemon.py
+Restart=always
+RestartSec=3
+Environment=PYTHONUNBUFFERED=1
+Environment=PATH=%h/.local/bin:/usr/local/bin:/usr/bin:/bin
+
+[Install]
+WantedBy=default.target

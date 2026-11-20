@@ -1,0 +1,10 @@
+[Unit]
+Description=Run Lumus ReAct Heartbeat every 25 minutes
+
+[Timer]
+OnBootSec=4min
+OnUnitActiveSec=25min
+Persistent=true
+
+[Install]
+WantedBy=timers.target
