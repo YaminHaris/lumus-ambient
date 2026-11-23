@@ -1,7 +1,11 @@
 # Lumus Ambient (`agy-ambient`)
 
-An always-on, local-first ambient AI assistant built on top of the **Antigravity CLI (`agy`)**.  
+An always-on, local-first personal AI assistant built on top of the **Antigravity CLI (`agy`)**.  
 Lumus runs a persistent background session daemon (`daemon.py`) with **Telegram text & voice note bridging**, an **HTTPS mobile PWA**, **D-Bus sleep/wake dreaming**, **autonomous background loops**, and **headless Chrome CDP app interfaces** for WhatsApp, Google Keep, Gmail, and local notes.
+
+<p align="center">
+  <img src="assets/lumus_demo.gif" alt="Lumus Ambient Live Mobile PWA and Daemon Runtime" width="840"/>
+</p>
 
 ---
 
@@ -179,7 +183,9 @@ All web-app tools share a **single dedicated, prompt-free Chrome profile** (`~/.
 
 - **Never commit secrets**: `.gitignore` excludes `telegram.json`, `telegram_offset.txt`, `token.txt`, `*.pem`, and `*.key`.
 - **`--dangerously-skip-permissions`**: `daemon.py` and `whatsapp_watcher.py` run `agy` with `--dangerously-skip-permissions` so background turns don't block on interactive prompts. Keep your `telegram.json` `chat_id` locked to your own Telegram account and keep `token.txt` private.
+- **Mobile PWA bind (`0.0.0.0:47892`)**: Protected by self-signed TLS (`cert.pem`/`key.pem`) + bearer token (`token.txt`) and intended for **trusted LAN / Tailscale VPN** access only (bind to `127.0.0.1` if mobile access isn't needed).
 - **Explicit confirmation for outbound messages**: `whatsapp_api.py send` requires `--confirm`, and `examples/GEMINI.md.example` instructs the agent never to send messages without explicit user confirmation. `gmail_api.py` is strictly read-only.
+- **Repository note**: Published as a squashed initial public release from local workspace history.
 
 ---
 
